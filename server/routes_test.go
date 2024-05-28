@@ -14,11 +14,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/uppercaveman/ollama-server/api"
 	"github.com/uppercaveman/ollama-server/parser"
 	"github.com/uppercaveman/ollama-server/version"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_Routes(t *testing.T) {
