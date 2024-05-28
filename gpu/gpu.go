@@ -20,8 +20,8 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/uppercaveman/ollama-server/envconfig"
 	"github.com/uppercaveman/ollama-server/format"
-	"github.com/uppercaveman/ollama-server/server/envconfig"
 )
 
 type handles struct {

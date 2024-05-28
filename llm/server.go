@@ -24,9 +24,9 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/uppercaveman/ollama-server/api"
+	"github.com/uppercaveman/ollama-server/envconfig"
 	"github.com/uppercaveman/ollama-server/format"
 	"github.com/uppercaveman/ollama-server/gpu"
-	"github.com/uppercaveman/ollama-server/server/envconfig"
 )
 
 type LlamaServer interface {
@@ -55,6 +55,7 @@ type llmServer struct {
 	totalLayers    uint64
 	gpuCount       int
 	loadDuration   time.Duration // Record how long it took the model to load
+	loadProgress   float32
 
 	sem *semaphore.Weighted
 }
@@ -89,6 +90,7 @@ func NewLlamaServer(gpus gpu.GpuInfoList, model string, ggml *GGML, adapters, pr
 
 		cpuRunner = serverForCpu()
 		gpuCount = 0
+		_, _, estimatedTotal = EstimateGPULayers(gpus, ggml, projectors, opts)
 	} else {
 		if gpus[0].Library == "metal" {
 			memInfo, err := gpu.GetCPUMem()
@@ -199,6 +201,23 @@ func NewLlamaServer(gpus gpu.GpuInfoList, model string, ggml *GGML, adapters, pr
 		params = append(params, "--numa")
 	}
 
+	flashAttnEnabled := envconfig.FlashAttention
+
+	// partial offloading does not support flash attention
+	if uint64(opts.NumGPU) < ggml.KV().BlockCount()+1 {
+		flashAttnEnabled = false
+	}
+
+	// only cuda (compute capability 7+) and metal support flash attention
+	for _, g := range gpus {
+		if g.Library != "metal" && (g.Library != "cuda" || g.DriverMajor < 7) {
+			flashAttnEnabled = false
+		}
+	}
+	if flashAttnEnabled {
+		params = append(params, "--flash-attn")
+	}
+
 	numParallel := envconfig.NumParallel
 
 	// TODO (jmorganca): multimodal models don't support parallel yet
@@ -224,7 +243,7 @@ func NewLlamaServer(gpus gpu.GpuInfoList, model string, ggml *GGML, adapters, pr
 			gpuCount = 0
 		}
 
-		// Find an availableServers  port, retry on each iterration in case the failure was a port conflict race
+		// Find an availableServers  port, retry on each iteration in case the failure was a port conflict race
 		port := 0
 		if a, err := net.ResolveTCPAddr("tcp", "localhost:0"); err == nil {
 			var l *net.TCPListener
@@ -317,8 +336,22 @@ func NewLlamaServer(gpus gpu.GpuInfoList, model string, ggml *GGML, adapters, pr
 		}
 
 		slog.Info("starting llama server", "cmd", s.cmd.String())
-		// Log at debug as the environment is inherited and might contain sensitive information
-		slog.Debug("subprocess", "environment", s.cmd.Env)
+		if envconfig.Debug {
+			filteredEnv := []string{}
+			for _, ev := range s.cmd.Env {
+				if strings.HasPrefix(ev, "CUDA_") ||
+					strings.HasPrefix(ev, "ROCM_") ||
+					strings.HasPrefix(ev, "HIP_") ||
+					strings.HasPrefix(ev, "HSA_") ||
+					strings.HasPrefix(ev, "GGML_") ||
+					strings.HasPrefix(ev, "PATH=") ||
+					strings.HasPrefix(ev, "LD_LIBRARY_PATH=") {
+					filteredEnv = append(filteredEnv, ev)
+				}
+			}
+			// Log at debug as the environment is inherited and might contain sensitive information
+			slog.Debug("subprocess", "environment", filteredEnv)
+		}
 
 		if err = s.cmd.Start(); err != nil {
 			// Detect permission denied and augment them essage about noexec
@@ -393,10 +426,11 @@ func (s ServerStatus) ToString() string {
 }
 
 type ServerStatusResp struct {
-	Status          string `json:"status"`
-	SlotsIdle       int    `json:"slots_idle"`
-	SlotsProcessing int    `json:"slots_processing"`
-	Error           string `json:"error"`
+	Status          string  `json:"status"`
+	SlotsIdle       int     `json:"slots_idle"`
+	SlotsProcessing int     `json:"slots_processing"`
+	Error           string  `json:"error"`
+	Progress        float32 `json:"progress"`
 }
 
 func (s *llmServer) getServerStatus(ctx context.Context) (ServerStatus, error) {
@@ -444,6 +478,7 @@ func (s *llmServer) getServerStatus(ctx context.Context) (ServerStatus, error) {
 	case "no slot available":
 		return ServerStatusNoSlotsAvailable, nil
 	case "loading model":
+		s.loadProgress = status.Progress
 		return ServerStatusLoadingModel, nil
 	default:
 		return ServerStatusError, fmt.Errorf("server error: %+v", status)
@@ -484,7 +519,8 @@ func (s *llmServer) Ping(ctx context.Context) error {
 
 func (s *llmServer) WaitUntilRunning(ctx context.Context) error {
 	start := time.Now()
-	expiresAt := time.Now().Add(10 * time.Minute) // be generous with timeout, large models can take a while to load
+	stallDuration := 60 * time.Second
+	stallTimer := time.Now().Add(stallDuration) // give up if we stall for
 
 	slog.Info("waiting for llama runner to start responding")
 	var lastStatus ServerStatus = -1
@@ -492,7 +528,7 @@ func (s *llmServer) WaitUntilRunning(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Info("context expired before server started")
+			slog.Warn("client connection closed before server finished loading, aborting load")
 			return fmt.Errorf("timed out waiting for llama runner to start: %w", ctx.Err())
 		case err := <-s.done:
 			msg := ""
@@ -502,13 +538,13 @@ func (s *llmServer) WaitUntilRunning(ctx context.Context) error {
 			return fmt.Errorf("llama runner process has terminated: %v %s", err, msg)
 		default:
 		}
-		if time.Now().After(expiresAt) {
+		if time.Now().After(stallTimer) {
 			// timeout
 			msg := ""
 			if s.status != nil && s.status.LastErrMsg != "" {
 				msg = s.status.LastErrMsg
 			}
-			return fmt.Errorf("timed out waiting for llama runner to start: %s", msg)
+			return fmt.Errorf("timed out waiting for llama runner to start - progress %0.2f - %s", s.loadProgress, msg)
 		}
 		if s.cmd.ProcessState != nil {
 			msg := ""
@@ -519,6 +555,7 @@ func (s *llmServer) WaitUntilRunning(ctx context.Context) error {
 		}
 		ctx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
 		defer cancel()
+		priorProgress := s.loadProgress
 		status, _ := s.getServerStatus(ctx)
 		if lastStatus != status && status != ServerStatusReady {
 			// Only log on status changes
@@ -531,6 +568,11 @@ func (s *llmServer) WaitUntilRunning(ctx context.Context) error {
 			return nil
 		default:
 			lastStatus = status
+			// Reset the timer as long as we're making forward progress on the load
+			if priorProgress != s.loadProgress {
+				slog.Debug(fmt.Sprintf("model load progress %0.2f", s.loadProgress))
+				stallTimer = time.Now().Add(stallDuration)
+			}
 			time.Sleep(time.Millisecond * 250)
 			continue
 		}
@@ -714,7 +756,7 @@ func (s *llmServer) Completion(ctx context.Context, req CompletionRequest, fn fu
 
 			var c completion
 			if err := json.Unmarshal(evt, &c); err != nil {
-				return fmt.Errorf("error unmarshaling llm prediction response: %v", err)
+				return fmt.Errorf("error unmarshalling llm prediction response: %v", err)
 			}
 
 			switch {
