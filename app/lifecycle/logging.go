@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/uppercaveman/ollama-server/server/envconfig"
+	"github.com/uppercaveman/ollama-server/envconfig"
 )
 
 func InitLogging() {

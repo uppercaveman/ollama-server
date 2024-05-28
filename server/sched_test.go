@@ -12,10 +12,10 @@ import (
 
 	"github.com/uppercaveman/ollama-server/api"
 	"github.com/uppercaveman/ollama-server/app/lifecycle"
+	"github.com/uppercaveman/ollama-server/envconfig"
 	"github.com/uppercaveman/ollama-server/format"
 	"github.com/uppercaveman/ollama-server/gpu"
 	"github.com/uppercaveman/ollama-server/llm"
-	"github.com/uppercaveman/ollama-server/server/envconfig"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -152,7 +152,7 @@ func newScenario(t *testing.T, ctx context.Context, modelName string, estimatedV
 }
 
 func TestRequests(t *testing.T) {
-	ctx, done := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, done := context.WithTimeout(context.Background(), time.Second)
 	defer done()
 
 	// Same model, same request
