@@ -7,6 +7,5 @@
 - 下载模型
 - API
 
-### Supported backends 
 - [llama.cpp](https://github.com/ggerganov/llama.cpp) project founded by Georgi Gerganov.
 - [ollama](https://github.com/ollama/ollama) get up and running with large language models locally.
