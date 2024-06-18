@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ollama/ollama/llm"
+	"github.com/uppercaveman/ollama-server/llm"
 )
 
 func convertFull(t *testing.T, p string) (llm.KV, llm.Tensors) {
