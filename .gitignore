@@ -12,5 +12,5 @@ ggml-metal.metal
 test_data
 *.crt
 llm/build
-ollama/ollama
+uppercaveman/ollama-server
 __debug_bin*

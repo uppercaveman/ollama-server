@@ -3,7 +3,7 @@
 ### CPU only
 
 ```bash
-docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
+docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama uppercaveman/ollama-server
 ```
 
 ### Nvidia GPU
@@ -26,19 +26,19 @@ sudo apt-get install -y nvidia-container-toolkit
 
 #### Install with Yum or Dnf
 1.  Configure the repository
-    
+
 ```bash
 curl -s -L https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo \
     | sudo tee /etc/yum.repos.d/nvidia-container-toolkit.repo
 ```
-    
+
 2. Install the NVIDIA Container Toolkit packages
-    
+
 ```bash
 sudo yum install -y nvidia-container-toolkit
 ```
 
-#### Configure Docker to use Nvidia driver 
+#### Configure Docker to use Nvidia driver
 ```
 sudo nvidia-ctk runtime configure --runtime=docker
 sudo systemctl restart docker
@@ -47,7 +47,7 @@ sudo systemctl restart docker
 #### Start the container
 
 ```bash
-docker run -d --gpus=all -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
+docker run -d --gpus=all -v ollama:/root/.ollama -p 11434:11434 --name ollama uppercaveman/ollama-server
 ```
 
 ### AMD GPU
@@ -55,7 +55,7 @@ docker run -d --gpus=all -v ollama:/root/.ollama -p 11434:11434 --name ollama ol
 To run Ollama using Docker with AMD GPUs, use the `rocm` tag and the following command:
 
 ```
-docker run -d --device /dev/kfd --device /dev/dri -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama:rocm
+docker run -d --device /dev/kfd --device /dev/dri -v ollama:/root/.ollama -p 11434:11434 --name ollama uppercaveman/ollama-server:rocm
 ```
 
 ### Run model locally
@@ -63,7 +63,7 @@ docker run -d --device /dev/kfd --device /dev/dri -v ollama:/root/.ollama -p 114
 Now you can run a model:
 
 ```
-docker exec -it ollama ollama run llama3
+docker exec -it ollama ollama run llama3.1
 ```
 
 ### Try different models

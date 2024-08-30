@@ -8,12 +8,14 @@ import (
 	"testing"
 
 	"github.com/uppercaveman/ollama-server/api"
-	"github.com/uppercaveman/ollama-server/envconfig"
+
+	"github.com/gin-gonic/gin"
 )
 
 func TestList(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
 	t.Setenv("OLLAMA_MODELS", t.TempDir())
-	envconfig.LoadConfig()
 
 	expectNames := []string{
 		"mistral:7b-instruct-q4_0",
@@ -29,13 +31,13 @@ func TestList(t *testing.T) {
 
 	var s Server
 	for _, n := range expectNames {
-		createRequest(t, s.CreateModelHandler, api.CreateRequest{
+		createRequest(t, s.CreateHandler, api.CreateRequest{
 			Name:      n,
 			Modelfile: fmt.Sprintf("FROM %s", createBinFile(t, nil, nil)),
 		})
 	}
 
-	w := createRequest(t, s.ListModelsHandler, nil)
+	w := createRequest(t, s.ListHandler, nil)
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status code 200, actual %d", w.Code)
 	}
