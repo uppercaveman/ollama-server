@@ -20,13 +20,17 @@ GPU.
 
 ## Manual install
 
-### Download the `ollama` binary
+### Download `ollama`
 
-Ollama is distributed as a self-contained binary. Download it to a directory in your PATH:
+Download and extract the Linux package:
 
 ```bash
-sudo curl -L https://ollama.com/download/ollama-linux-amd64 -o /usr/bin/ollama
-sudo chmod +x /usr/bin/ollama
+curl -fsSL https://ollama.com/download/ollama-linux-amd64.tgz | sudo tar zx -C /usr
+```
+
+If you have an AMD GPU, also download and extract the ROCm package into the same location
+```bash
+curl -fsSL https://ollama.com/download/ollama-linux-amd64-rocm.tgz | sudo tar zx -C /usr
 ```
 
 ### Adding Ollama as a startup service (recommended)
@@ -96,13 +100,12 @@ curl -fsSL https://ollama.com/install.sh | sh
 Or by downloading the ollama binary:
 
 ```bash
-sudo curl -L https://ollama.com/download/ollama-linux-amd64 -o /usr/bin/ollama
-sudo chmod +x /usr/bin/ollama
+curl -fsSL https://ollama.com/download/ollama-linux-amd64.tgz | sudo tar zx -C /usr
 ```
 
 ## Installing specific versions
 
-Use `OLLAMA_VERSION` environment variable with the install script to install a specific version of Ollama, including pre-releases. You can find the version numbers in the [releases page](https://github.com/ollama/ollama/releases). 
+Use `OLLAMA_VERSION` environment variable with the install script to install a specific version of Ollama, including pre-releases. You can find the version numbers in the [releases page](https://github.com/uppercaveman/ollama-server/releases). 
 
 For example:
 

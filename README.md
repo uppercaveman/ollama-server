@@ -8,4 +8,4 @@
 - API
 
 - [llama.cpp](https://github.com/ggerganov/llama.cpp) project founded by Georgi Gerganov.
-- [ollama](https://github.com/ollama/ollama) get up and running with large language models locally.
+- [ollama](https://github.com/uppercaveman/ollama-server) get up and running with large language models locally.

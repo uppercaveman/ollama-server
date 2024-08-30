@@ -18,7 +18,7 @@
 1. Create a new Fly app
 
     ```bash
-    fly launch --name <name> --image ollama/ollama --internal-port 11434 --vm-size shared-cpu-8x --now
+    fly launch --name <name> --image uppercaveman/ollama-server --internal-port 11434 --vm-size shared-cpu-8x --now
     ```
 
 1. Pull and run `orca-mini:3b`
